@@ -1,60 +1,55 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { socket } from "./socket";
 
 const API = process.env.REACT_APP_API;
 
 export default function App() {
   const [contacts, setContacts] = useState([]);
-  const [phone, setPhone] = useState(null);
+  const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [text, setText] = useState("");
 
   useEffect(() => {
     axios.get(API + "/api/contacts").then(res => setContacts(res.data));
   }, []);
 
-  const openChat = async (p) => {
-    setPhone(p);
-    const res = await axios.get(API + "/api/messages/" + p);
+  const openChat = async (phone) => {
+    setActive(phone);
+    const res = await axios.get(API + "/api/messages/" + phone);
     setMessages(res.data);
-    socket.emit("join", p);
-  };
-
-  useEffect(() => {
-    socket.on("new_message", (msg) => {
-      setMessages(prev => [...prev, msg]);
-    });
-  }, []);
-
-  const sendMsg = async () => {
-    await axios.post(API + "/api/send", { phone, message: text });
-    setMessages(prev => [...prev, { message: text, direction: "outgoing" }]);
-    setText("");
   };
 
   return (
     <div style={{ display: "flex", height: "100vh" }}>
-      <div style={{ width: "30%" }}>
+      
+      {/* LEFT PANEL */}
+      <div style={{ width: "30%", borderRight: "1px solid #ccc" }}>
+        <h3 style={{ padding: 10 }}>Chats</h3>
         {contacts.map(c => (
-          <div key={c.phone} onClick={() => openChat(c.phone)}>
-            {c.name || c.phone}
+          <div
+            key={c.phone}
+            onClick={() => openChat(c.phone)}
+            style={{ padding: 10, cursor: "pointer", borderBottom: "1px solid #eee" }}
+          >
+            <b>{c.phone}</b><br/>
+            <small>{c.lastMessage}</small>
           </div>
         ))}
       </div>
 
-      <div style={{ flex: 1 }}>
-        {messages.map((m, i) => (
-          <div key={i}>{m.message}</div>
-        ))}
-
-        {phone && (
+      {/* RIGHT PANEL */}
+      <div style={{ flex: 1, padding: 20 }}>
+        {active ? (
           <>
-            <input value={text} onChange={e => setText(e.target.value)} />
-            <button onClick={sendMsg}>Send</button>
+            <h3>{active}</h3>
+            {messages.map((m, i) => (
+              <div key={i}>{m.message}</div>
+            ))}
           </>
+        ) : (
+          <h3>Select a chat</h3>
         )}
       </div>
+
     </div>
   );
 }
