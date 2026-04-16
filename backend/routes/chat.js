@@ -5,7 +5,7 @@ import Message from "../models/Message.js";
 const router = express.Router();
 
 
-// ✅ GET CONTACTS (sorted by latest chat)
+// ✅ GET CONTACTS (latest first)
 router.get("/contacts", async (req, res) => {
   try {
     const contacts = await Contact.find().sort({ updatedAt: -1 });
@@ -17,11 +17,11 @@ router.get("/contacts", async (req, res) => {
 });
 
 
-// ✅ GET MESSAGES (latest first)
+// ✅ GET MESSAGES (chat order)
 router.get("/messages/:phone", async (req, res) => {
   try {
     const messages = await Message.find({ phone: req.params.phone })
-      .sort({ createdAt: 1 }); // oldest → newest
+      .sort({ createdAt: 1 });
 
     res.json(messages);
   } catch (err) {
@@ -31,21 +31,28 @@ router.get("/messages/:phone", async (req, res) => {
 });
 
 
-// ✅ MARK AS SEEN (IMPORTANT)
+// 🔥 MARK AS SEEN + REALTIME
 router.post("/seen/:phone", async (req, res) => {
   try {
     const phone = req.params.phone;
 
-    // reset unread count
+    // unread reset
     await Contact.updateOne({ phone }, { unread: 0 });
 
-    // update message status
+    // message status update
     await Message.updateMany(
       { phone, direction: "incoming" },
       { status: "seen" }
     );
 
+    // 🔥 realtime seen event
+    req.io?.to(phone).emit("message_status", {
+      phone,
+      status: "seen"
+    });
+
     res.send("Seen updated");
+
   } catch (err) {
     console.log(err);
     res.status(500).send("Error updating seen");
@@ -53,7 +60,7 @@ router.post("/seen/:phone", async (req, res) => {
 });
 
 
-// ✅ SEARCH CONTACTS
+// 🔍 SEARCH CONTACTS
 router.get("/search", async (req, res) => {
   try {
     const q = req.query.q || "";
@@ -67,6 +74,7 @@ router.get("/search", async (req, res) => {
     }).sort({ updatedAt: -1 });
 
     res.json(contacts);
+
   } catch (err) {
     console.log(err);
     res.status(500).send("Search error");
