@@ -12,6 +12,8 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [typing, setTyping] = useState(false);
 
+  const [tab, setTab] = useState("chats"); // 🆕 ADD
+
   const bottomRef = useRef();
   const typingTimeout = useRef(null);
 
@@ -91,73 +93,44 @@ export default function App() {
 
   // SEND TEXT
   const sendMsg = async () => {
-    if (!active) {
-      alert("Select chat first");
-      return;
-    }
+    if (!active) return alert("Select chat first");
+    if (!text) return alert("Enter message");
 
-    if (!text) {
-      alert("Enter message");
-      return;
-    }
+    await axios.post(API + "/api/send", {
+      phone: active,
+      message: text
+    });
 
-    try {
-      await axios.post(API + "/api/send", {
-        phone: active,
-        message: text
-      });
+    setMessages(prev => [...prev, {
+      phone: active,
+      message: text,
+      direction: "outgoing",
+      status: "sent",
+      createdAt: new Date()
+    }]);
 
-      setMessages(prev => [...prev, {
-        phone: active,
-        message: text,
-        direction: "outgoing",
-        status: "sent",
-        createdAt: new Date()
-      }]);
-
-      setText("");
-      socket.emit("stop_typing", active);
-
-    } catch (err) {
-      console.log(err);
-      alert("Send failed");
-    }
+    setText("");
+    socket.emit("stop_typing", active);
   };
 
-  // SEND MEDIA
+  // SEND FILE
   const sendFile = async (e) => {
     const file = e.target.files[0];
-
-    if (!active) {
-      alert("Select chat first");
-      return;
-    }
-
-    if (!file) return;
+    if (!file || !active) return;
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("phone", active);
 
-    try {
-      await axios.post(API + "/api/send/media", formData);
-
-      setMessages(prev => [...prev, {
-        phone: active,
-        message: file.name,
-        direction: "outgoing",
-        media: true,
-        mimeType: file.type,
-        createdAt: new Date()
-      }]);
-
-    } catch (err) {
-      console.log(err);
-      alert("Media send failed");
-    }
+    await axios.post(API + "/api/send/media", formData);
   };
 
+  // 🔥 FILTER UPDATE
   const filtered = contacts
+    .filter(c => {
+      if (tab === "chats") return c.lastMessage;
+      return true;
+    })
     .filter(c =>
       c.phone.includes(search) ||
       (c.lastMessage || "").toLowerCase().includes(search.toLowerCase())
@@ -172,6 +145,31 @@ export default function App() {
         <div style={{ padding: 15, background: "#075E54", color: "white", fontWeight: "bold" }}>
           WhatsApp CRM
         </div>
+
+        {/* 🆕 TABS */}
+        <div style={{ display: "flex", gap: 10, padding: 10 }}>
+          <button onClick={() => setTab("chats")}>Chats</button>
+          <button onClick={() => setTab("contacts")}>Contacts</button>
+        </div>
+
+        {/* 🆕 CSV UPLOAD */}
+        {tab === "contacts" && (
+          <input
+            type="file"
+            accept=".csv"
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              const formData = new FormData();
+              formData.append("file", file);
+
+              await axios.post(API + "/api/upload-csv", formData);
+
+              alert("Contacts uploaded!");
+              loadContacts();
+            }}
+            style={{ margin: 10 }}
+          />
+        )}
 
         <input
           placeholder="Search..."
@@ -249,7 +247,6 @@ export default function App() {
             return (
               <div key={i} style={{ display: "flex", flexDirection: "column" }}>
 
-                {/* DATE DIVIDER */}
                 {showDivider && (
                   <div style={{
                     textAlign: "center",
@@ -261,7 +258,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* MESSAGE */}
                 <div
                   style={{
                     maxWidth: "60%",
@@ -283,7 +279,6 @@ export default function App() {
                     m.message
                   )}
 
-                  {/* TIME + TICK */}
                   <div style={{
                     fontSize: 10,
                     display: "flex",
@@ -306,41 +301,25 @@ export default function App() {
           <div style={{
             display: "flex",
             padding: 10,
-            background: "#f0f0f0",
-            position: "relative",
-            zIndex: 10
+            background: "#f0f0f0"
           }}>
             <input
               value={text}
               onChange={(e) => {
                 setText(e.target.value);
-
                 socket.emit("typing", active);
 
                 clearTimeout(typingTimeout.current);
-
                 typingTimeout.current = setTimeout(() => {
                   socket.emit("stop_typing", active);
                 }, 1000);
               }}
               style={{ flex: 1, padding: 10 }}
-              placeholder="Type message..."
             />
 
             <input type="file" onChange={sendFile} />
 
-            <button
-              onClick={sendMsg}
-              style={{
-                background: "#25D366",
-                color: "white",
-                border: "none",
-                padding: "10px 15px",
-                cursor: "pointer"
-              }}
-            >
-              Send
-            </button>
+            <button onClick={sendMsg}>Send</button>
           </div>
         )}
       </div>
