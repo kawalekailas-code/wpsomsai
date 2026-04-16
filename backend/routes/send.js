@@ -37,7 +37,6 @@ router.post("/", async (req, res) => {
       status: "sent"
     });
 
-    // 🔥 realtime
     req.io?.to(phone).emit("new_message", {
       phone,
       message,
@@ -54,28 +53,41 @@ router.post("/", async (req, res) => {
 });
 
 
-// 📎 UPLOAD MEDIA TO WHATSAPP (FIXED)
-const uploadToWhatsApp = async (filePath) => {
+// 📎 UPLOAD MEDIA (FIXED)
+const uploadToWhatsApp = async (filePath, mimeType) => {
   const form = new FormData();
 
+  // 🔥 EXTENSION FIX
+  let ext = "bin";
+  if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
+  else if (mimeType.includes("png")) ext = "png";
+  else if (mimeType.includes("pdf")) ext = "pdf";
+  else if (mimeType.includes("mp4")) ext = "mp4";
+
   form.append("file", fs.createReadStream(filePath), {
-    filename: "file" // 🔥 IMPORTANT FIX
+    filename: `file.${ext}` // 🔥 MUST
   });
 
   form.append("messaging_product", "whatsapp");
 
-  const res = await axios.post(
-    `https://graph.facebook.com/v18.0/${process.env.PHONE_ID}/media`,
-    form,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.TOKEN}`,
-        ...form.getHeaders()
+  try {
+    const res = await axios.post(
+      `https://graph.facebook.com/v18.0/${process.env.PHONE_ID}/media`,
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.TOKEN}`,
+          ...form.getHeaders()
+        }
       }
-    }
-  );
+    );
 
-  return res.data.id;
+    return res.data.id;
+
+  } catch (err) {
+    console.log("UPLOAD ERROR:", err.response?.data || err);
+    throw err;
+  }
 };
 
 
@@ -93,17 +105,18 @@ router.post("/media", upload.single("file"), async (req, res) => {
 
     console.log("FILE:", file);
 
-    // ✅ upload
-    const mediaId = await uploadToWhatsApp(file.path);
+    // ✅ upload media
+    const mediaId = await uploadToWhatsApp(file.path, mimeType);
 
     console.log("MEDIA ID:", mediaId);
 
-    // detect type
+    // 🔥 detect type
     let type = "document";
     if (mimeType.startsWith("image")) type = "image";
-    if (mimeType.startsWith("video")) type = "video";
+    else if (mimeType.startsWith("video")) type = "video";
+    else if (mimeType.startsWith("audio")) type = "audio";
 
-    // ✅ send to WhatsApp
+    // ✅ send message
     await axios.post(
       `https://graph.facebook.com/v18.0/${process.env.PHONE_ID}/messages`,
       {
@@ -119,7 +132,7 @@ router.post("/media", upload.single("file"), async (req, res) => {
       }
     );
 
-    // ✅ SAVE LOCAL FILE NAME (for UI preview)
+    // ✅ save for UI preview
     const fileName = file.filename;
 
     await Message.create({
@@ -141,7 +154,7 @@ router.post("/media", upload.single("file"), async (req, res) => {
       status: "sent"
     });
 
-    // ❌ IMPORTANT: delete करू नको (preview साठी लागतो)
+    // ❌ delete करू नको (preview साठी लागतो)
     // fs.unlinkSync(file.path);
 
     res.json({ success: true });
