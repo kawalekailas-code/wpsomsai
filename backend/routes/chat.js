@@ -14,7 +14,7 @@ const upload = multer({ dest: "uploads/" });
 
 
 // ✅ GET CONTACTS (latest first)
-router.get("/contacts", async (req, res) => {
+router.get("/contacts", async (req, res) => {   
   try {
     const contacts = await Contact.find().sort({ updatedAt: -1 });
     res.json(contacts);
@@ -87,7 +87,7 @@ router.get("/search", async (req, res) => {
 });
 
 
-// 🚀🔥 CSV UPLOAD (NEW ADD - DO NOT DELETE ANYTHING ABOVE)
+// 🚀🔥 CSV UPLOAD (UPGRADED - NAME FIX ONLY ADD)
 router.post("/upload-csv", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -102,21 +102,37 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
       .on("end", async () => {
 
         for (let row of results) {
-          if (!row.phone) continue;
 
-          let phone = row.phone.toString().trim();
+          // 🔥 SMART COLUMN DETECT (NEW ADD)
+          const keys = Object.keys(row);
+
+          const phoneKey = keys.find(k =>
+            k.toLowerCase().includes("phone")
+          );
+
+          const nameKey = keys.find(k =>
+            k.toLowerCase().includes("name")
+          );
+
+          if (!phoneKey) continue;
+
+          let phone = row[phoneKey]?.toString().trim();
+
+          if (!phone) continue;
 
           // 🔥 +91 auto add
           if (!phone.startsWith("91")) {
             phone = "91" + phone;
           }
 
+          const name = nameKey ? row[nameKey] : "";
+
           const exists = await Contact.findOne({ phone });
 
           if (!exists) {
             await Contact.create({
               phone,
-              name: row.name || "",
+              name: name || "",
               lastMessage: "",
               unread: 0
             });
