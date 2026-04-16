@@ -1,4 +1,8 @@
 import express from "express";
+import axios from "axios";
+import fs from "fs";
+import path from "path";
+
 import Contact from "../models/Contact.js";
 import Message from "../models/Message.js";
 
@@ -18,6 +22,44 @@ router.get("/", (req, res) => {
 });
 
 
+// 📎 DOWNLOAD MEDIA FROM WHATSAPP
+const downloadMedia = async (mediaId) => {
+  try {
+    // STEP 1: get media URL
+    const urlRes = await axios.get(
+      `https://graph.facebook.com/v18.0/${mediaId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.TOKEN}`
+        }
+      }
+    );
+
+    const mediaUrl = urlRes.data.url;
+
+    // STEP 2: download file
+    const mediaRes = await axios.get(mediaUrl, {
+      headers: {
+        Authorization: `Bearer ${process.env.TOKEN}`
+      },
+      responseType: "arraybuffer"
+    });
+
+    // STEP 3: save file locally
+    const fileName = `${Date.now()}.bin`;
+    const filePath = path.join("uploads", fileName);
+
+    fs.writeFileSync(filePath, mediaRes.data);
+
+    return fileName;
+
+  } catch (err) {
+    console.log("Media download error:", err.response?.data || err);
+    return null;
+  }
+};
+
+
 // ✅ RECEIVE MESSAGE
 router.post("/", async (req, res) => {
   try {
@@ -25,17 +67,42 @@ router.post("/", async (req, res) => {
 
     if (msg) {
       const phone = msg.from;
-      const text = msg.text?.body || "";
 
-      // ✅ save message with status
+      let text = "";
+      let media = false;
+      let fileName = null;
+      let mimeType = "";
+
+      // 🟢 TEXT MESSAGE
+      if (msg.text) {
+        text = msg.text.body;
+      }
+
+      // 🟢 IMAGE / DOC / VIDEO
+      if (msg.image || msg.document || msg.video) {
+        media = true;
+
+        const mediaObj = msg.image || msg.document || msg.video;
+        const mediaId = mediaObj.id;
+
+        mimeType = mediaObj.mime_type;
+
+        fileName = await downloadMedia(mediaId);
+
+        text = fileName || "media";
+      }
+
+      // ✅ save message
       await Message.create({
         phone,
         message: text,
         direction: "incoming",
-        status: "delivered"
+        status: "delivered",
+        media,
+        mimeType
       });
 
-      // ✅ contact find or create
+      // ✅ contact update
       let contact = await Contact.findOne({ phone });
 
       if (!contact) {
@@ -46,18 +113,20 @@ router.post("/", async (req, res) => {
         });
       } else {
         contact.lastMessage = text;
-        contact.unread += 1; // 🔴 unread increase
+        contact.unread += 1;
         await contact.save();
       }
 
-      // ✅ realtime emit
+      // ⚡ realtime message
       req.io?.to(phone).emit("new_message", {
         phone,
         message: text,
-        direction: "incoming"
+        direction: "incoming",
+        media,
+        mimeType
       });
 
-      // ✅ update contact list realtime
+      // ⚡ update contact list
       req.io?.emit("contact_update", {
         phone,
         lastMessage: text
@@ -65,6 +134,7 @@ router.post("/", async (req, res) => {
     }
 
     res.sendStatus(200);
+
   } catch (err) {
     console.log("Webhook error:", err);
     res.sendStatus(200);
