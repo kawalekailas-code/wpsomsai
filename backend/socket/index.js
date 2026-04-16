@@ -2,7 +2,18 @@ import { Server } from "socket.io";
 
 export const initSocket = (server) => {
   const io = new Server(server, {
-    cors: { origin: "*" }
+
+    // 🔥 CORS FIX (IMPORTANT)
+    cors: {
+      origin: [
+        "https://wpsomsai-1.onrender.com"
+      ],
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+
+    // 🔥 ADD (stability)
+    transports: ["websocket"]
   });
 
   io.on("connection", (socket) => {
