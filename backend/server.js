@@ -15,8 +15,16 @@ dotenv.config();
 
 const app = express();
 
+// ✅ CORS FIX (🔥 IMPORTANT ADD)
+app.use(cors({
+  origin: [
+    "https://wpsomsai-1.onrender.com"
+  ],
+  methods: ["GET", "POST"],
+  credentials: true
+}));
+
 // ✅ MIDDLEWARE
-app.use(cors());
 app.use(express.json());
 
 // ✅ ENSURE uploads folder exists
