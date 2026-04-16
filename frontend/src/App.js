@@ -25,6 +25,7 @@ export default function App() {
 
   const openChat = async (phone) => {
     setActive(phone);
+
     const res = await axios.get(API + "/api/messages/" + phone);
     setMessages(res.data);
 
@@ -56,43 +57,72 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // 🔥 SEND TEXT
   const sendMsg = async () => {
-    if (!text || !active) return;
+    console.log("CLICKED", text, active);
 
-    await axios.post(API + "/api/send", {
-      phone: active,
-      message: text
-    });
+    if (!active) {
+      alert("❌ First select chat");
+      return;
+    }
 
-    setMessages(prev => [...prev, {
-      phone: active,
-      message: text,
-      direction: "outgoing",
-      status: "sent"
-    }]);
+    if (!text) {
+      alert("❌ Enter message");
+      return;
+    }
 
-    setText("");
-    socket.emit("stop_typing", active);
+    try {
+      await axios.post(API + "/api/send", {
+        phone: active,
+        message: text
+      });
+
+      setMessages(prev => [...prev, {
+        phone: active,
+        message: text,
+        direction: "outgoing",
+        status: "sent"
+      }]);
+
+      setText("");
+      socket.emit("stop_typing", active);
+
+    } catch (err) {
+      console.log("SEND ERROR:", err);
+      alert("Send failed");
+    }
   };
 
-  // 🔥 MEDIA SEND
+  // 🔥 SEND MEDIA
   const sendFile = async (e) => {
     const file = e.target.files[0];
-    if (!file || !active) return;
+
+    if (!active) {
+      alert("Select chat first");
+      return;
+    }
+
+    if (!file) return;
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("phone", active);
 
-    await axios.post(API + "/api/send/media", formData);
+    try {
+      await axios.post(API + "/api/send/media", formData);
 
-    setMessages(prev => [...prev, {
-      phone: active,
-      message: file.name,
-      direction: "outgoing",
-      media: true,
-      mimeType: file.type
-    }]);
+      setMessages(prev => [...prev, {
+        phone: active,
+        message: "Uploading...",
+        direction: "outgoing",
+        media: true,
+        mimeType: file.type
+      }]);
+
+    } catch (err) {
+      console.log("MEDIA ERROR:", err);
+      alert("Media send failed");
+    }
   };
 
   const filtered = contacts
@@ -193,7 +223,13 @@ export default function App() {
         </div>
 
         {active && (
-          <div style={{ display: "flex", padding: 10, background: "#f0f0f0" }}>
+          <div style={{
+            display: "flex",
+            padding: 10,
+            background: "#f0f0f0",
+            position: "relative",
+            zIndex: 10   // 🔥 FIX
+          }}>
             <input
               value={text}
               onChange={(e) => {
@@ -201,16 +237,21 @@ export default function App() {
                 socket.emit("typing", active);
               }}
               style={{ flex: 1, padding: 10 }}
+              placeholder="Type message..."
             />
 
             <input type="file" onChange={sendFile} />
 
-            <button style={{
-              background: "#25D366",
-              color: "white",
-              border: "none",
-              padding: "10px 15px"
-            }} onClick={sendMsg}>
+            <button
+              onClick={() => sendMsg()}
+              style={{
+                background: "#25D366",
+                color: "white",
+                border: "none",
+                padding: "10px 15px",
+                cursor: "pointer"
+              }}
+            >
               Send
             </button>
           </div>
