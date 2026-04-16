@@ -35,14 +35,13 @@ export default function App() {
     socket.emit("join", phone);
   };
 
-  // 🔥 SOCKET EVENTS
+  // SOCKET
   useEffect(() => {
     socket.on("new_message", (msg) => {
       setMessages(prev => [...prev, msg]);
       loadContacts();
     });
 
-    // ✅ FIXED TYPING
     socket.on("typing", (phone) => {
       if (phone === active) setTyping(true);
     });
@@ -65,7 +64,32 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 🔥 SEND TEXT
+  // ⏱️ TIME
+  const formatTime = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    return d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
+  // 📅 DATE DIVIDER
+  const formatDateDivider = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    const today = new Date();
+
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+    return d.toLocaleDateString();
+  };
+
+  // SEND TEXT
   const sendMsg = async () => {
     if (!active) {
       alert("Select chat first");
@@ -87,7 +111,8 @@ export default function App() {
         phone: active,
         message: text,
         direction: "outgoing",
-        status: "sent"
+        status: "sent",
+        createdAt: new Date()
       }]);
 
       setText("");
@@ -99,7 +124,7 @@ export default function App() {
     }
   };
 
-  // 🔥 SEND MEDIA
+  // SEND MEDIA
   const sendFile = async (e) => {
     const file = e.target.files[0];
 
@@ -119,10 +144,11 @@ export default function App() {
 
       setMessages(prev => [...prev, {
         phone: active,
-        message: "Uploading...",
+        message: file.name,
         direction: "outgoing",
         media: true,
-        mimeType: file.type
+        mimeType: file.type,
+        createdAt: new Date()
       }]);
 
     } catch (err) {
@@ -141,7 +167,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
 
-      {/* LEFT PANEL */}
+      {/* LEFT */}
       <div style={{ width: "30%", borderRight: "1px solid #ddd", overflowY: "auto" }}>
         <div style={{ padding: 15, background: "#075E54", color: "white", fontWeight: "bold" }}>
           WhatsApp CRM
@@ -183,7 +209,7 @@ export default function App() {
         ))}
       </div>
 
-      {/* RIGHT PANEL */}
+      {/* RIGHT */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
 
         {/* HEADER */}
@@ -212,33 +238,66 @@ export default function App() {
           display: "flex",
           flexDirection: "column"
         }}>
-          {messages.map((m, i) => (
-            <div key={i}
-              style={{
-                maxWidth: "60%",
-                padding: "8px 12px",
-                margin: "5px",
-                borderRadius: "15px",
-                background: m.direction === "outgoing" ? "#DCF8C6" : "#fff",
-                alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.2)"
-              }}
-            >
-              {m.media ? (
-                m.mimeType?.startsWith("image") ? (
-                  <img src={API + "/uploads/" + m.message} width="200" />
-                ) : (
-                  <a href={API + "/uploads/" + m.message}>📎 File</a>
-                )
-              ) : (
-                m.message
-              )}
+          {messages.map((m, i) => {
+            const curr = m.createdAt ? new Date(m.createdAt).toDateString() : null;
+            const prev = i > 0 && messages[i - 1].createdAt
+              ? new Date(messages[i - 1].createdAt).toDateString()
+              : null;
 
-              <div style={{ fontSize: 10 }}>
-                {m.status === "seen" ? "✔✔" : "✔"}
+            const showDivider = curr && curr !== prev;
+
+            return (
+              <div key={i} style={{ display: "flex", flexDirection: "column" }}>
+
+                {/* DATE DIVIDER */}
+                {showDivider && (
+                  <div style={{
+                    textAlign: "center",
+                    margin: "10px 0",
+                    fontSize: 12,
+                    color: "#555"
+                  }}>
+                    {formatDateDivider(m.createdAt)}
+                  </div>
+                )}
+
+                {/* MESSAGE */}
+                <div
+                  style={{
+                    maxWidth: "60%",
+                    padding: "8px 12px",
+                    margin: "5px",
+                    borderRadius: "15px",
+                    background: m.direction === "outgoing" ? "#DCF8C6" : "#fff",
+                    alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)"
+                  }}
+                >
+                  {m.media ? (
+                    m.mimeType?.startsWith("image") ? (
+                      <img src={API + "/uploads/" + m.message} width="200" />
+                    ) : (
+                      <a href={API + "/uploads/" + m.message}>📎 File</a>
+                    )
+                  ) : (
+                    m.message
+                  )}
+
+                  {/* TIME + TICK */}
+                  <div style={{
+                    fontSize: 10,
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 5
+                  }}>
+                    <span>{formatTime(m.createdAt)}</span>
+                    <span>{m.status === "seen" ? "✔✔" : "✔"}</span>
+                  </div>
+                </div>
+
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={bottomRef}></div>
         </div>
 
