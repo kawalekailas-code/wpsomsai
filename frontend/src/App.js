@@ -12,7 +12,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [typing, setTyping] = useState(false);
 
-  const [tab, setTab] = useState("chats"); // 🆕 ADD
+  const [tab, setTab] = useState("chats"); // SAME
 
   const bottomRef = useRef();
   const typingTimeout = useRef(null);
@@ -37,7 +37,7 @@ export default function App() {
     socket.emit("join", phone);
   };
 
-  // SOCKET
+  // SOCKET (UNCHANGED)
   useEffect(() => {
     socket.on("new_message", (msg) => {
       setMessages(prev => [...prev, msg]);
@@ -66,7 +66,7 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ⏱️ TIME
+  // TIME (UNCHANGED)
   const formatTime = (date) => {
     if (!date) return "";
     const d = new Date(date);
@@ -76,7 +76,7 @@ export default function App() {
     });
   };
 
-  // 📅 DATE DIVIDER
+  // DATE DIVIDER (UNCHANGED)
   const formatDateDivider = (date) => {
     if (!date) return "";
     const d = new Date(date);
@@ -91,7 +91,7 @@ export default function App() {
     return d.toLocaleDateString();
   };
 
-  // SEND TEXT
+  // SEND TEXT (UNCHANGED)
   const sendMsg = async () => {
     if (!active) return alert("Select chat first");
     if (!text) return alert("Enter message");
@@ -113,7 +113,7 @@ export default function App() {
     socket.emit("stop_typing", active);
   };
 
-  // SEND FILE
+  // SEND FILE (UNCHANGED)
   const sendFile = async (e) => {
     const file = e.target.files[0];
     if (!file || !active) return;
@@ -125,7 +125,7 @@ export default function App() {
     await axios.post(API + "/api/send/media", formData);
   };
 
-  // 🔥 FILTER UPDATE
+  // FILTER (UNCHANGED)
   const filtered = contacts
     .filter(c => {
       if (tab === "chats") return c.lastMessage;
@@ -146,29 +146,50 @@ export default function App() {
           WhatsApp CRM
         </div>
 
-        {/* 🆕 TABS */}
+        {/* TABS */}
         <div style={{ display: "flex", gap: 10, padding: 10 }}>
           <button onClick={() => setTab("chats")}>Chats</button>
           <button onClick={() => setTab("contacts")}>Contacts</button>
         </div>
 
-        {/* 🆕 CSV UPLOAD */}
+        {/* 🔥 FIXED CSV UPLOAD */}
         {tab === "contacts" && (
-          <input
-            type="file"
-            accept=".csv"
-            onChange={async (e) => {
-              const file = e.target.files[0];
-              const formData = new FormData();
-              formData.append("file", file);
+          <div style={{ padding: 10 }}>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={async (e) => {
+                const file = e.target.files[0];
 
-              await axios.post(API + "/api/upload-csv", formData);
+                if (!file) {
+                  alert("❌ Please select file");
+                  return;
+                }
 
-              alert("Contacts uploaded!");
-              loadContacts();
-            }}
-            style={{ margin: 10 }}
-          />
+                const formData = new FormData();
+                formData.append("file", file);
+
+                try {
+                  await axios.post(API + "/api/upload-csv", formData, {
+                    headers: {
+                      "Content-Type": "multipart/form-data"
+                    }
+                  });
+
+                  alert("✅ Contacts uploaded!");
+                  loadContacts();
+
+                } catch (err) {
+                  console.log(err);
+                  alert("❌ Upload failed");
+                }
+              }}
+            />
+
+            <div style={{ fontSize: 12, marginTop: 5 }}>
+              Upload CSV (name, phone)
+            </div>
+          </div>
         )}
 
         <input
