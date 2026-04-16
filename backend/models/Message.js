@@ -1,12 +1,24 @@
 import mongoose from "mongoose";
 
-export default mongoose.model("Message", {
+const schema = new mongoose.Schema({
   phone: String,
   message: String,
+
+  // incoming / outgoing
   direction: String,
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    expires: 60 * 60 * 24 * 30
+
+  // ✔ message status system
+  status: {
+    type: String,
+    enum: ["sent", "delivered", "seen"],
+    default: "sent"
   }
+
+}, {
+  timestamps: true // ✅ auto createdAt + updatedAt
 });
+
+// ⏳ auto delete after 30 days
+schema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
+
+export default mongoose.model("Message", schema);
