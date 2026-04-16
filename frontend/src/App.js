@@ -10,6 +10,7 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
+  const [typing, setTyping] = useState(false);
 
   const bottomRef = useRef();
 
@@ -32,10 +33,22 @@ export default function App() {
     socket.emit("join", phone);
   };
 
+  // 🔥 SOCKET EVENTS
   useEffect(() => {
     socket.on("new_message", (msg) => {
       setMessages(prev => [...prev, msg]);
       loadContacts();
+    });
+
+    socket.on("typing", () => setTyping(true));
+    socket.on("stop_typing", () => setTyping(false));
+
+    socket.on("message_status", ({ phone, status }) => {
+      setMessages(prev =>
+        prev.map(m =>
+          m.phone === phone ? { ...m, status } : m
+        )
+      );
     });
   }, []);
 
@@ -52,15 +65,17 @@ export default function App() {
     });
 
     setMessages(prev => [...prev, {
+      phone: active,
       message: text,
       direction: "outgoing",
       status: "sent"
     }]);
 
     setText("");
+    socket.emit("stop_typing", active);
   };
 
-  // 🔥 MEDIA SEND FUNCTION
+  // 🔥 MEDIA SEND
   const sendFile = async (e) => {
     const file = e.target.files[0];
     if (!file || !active) return;
@@ -72,6 +87,7 @@ export default function App() {
     await axios.post(API + "/api/send/media", formData);
 
     setMessages(prev => [...prev, {
+      phone: active,
       message: file.name,
       direction: "outgoing",
       media: true,
@@ -89,9 +105,9 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
 
-      {/* LEFT */}
+      {/* LEFT PANEL */}
       <div style={{ width: "30%", borderRight: "1px solid #ddd", overflowY: "auto" }}>
-        <div style={{ padding: 10, background: "#075E54", color: "white" }}>
+        <div style={{ padding: 15, background: "#075E54", color: "white", fontWeight: "bold" }}>
           WhatsApp CRM
         </div>
 
@@ -99,7 +115,7 @@ export default function App() {
           placeholder="Search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: "95%", margin: 10, padding: 5 }}
+          style={{ width: "95%", margin: 10, padding: 8 }}
         />
 
         {filtered.map(c => (
@@ -131,10 +147,11 @@ export default function App() {
         ))}
       </div>
 
-      {/* RIGHT */}
+      {/* RIGHT PANEL */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: 10, background: "#075E54", color: "white" }}>
+        <div style={{ padding: 15, background: "#075E54", color: "white" }}>
           {active || "Select chat"}
+          {typing && <div style={{ fontSize: 12 }}>Typing...</div>}
         </div>
 
         <div style={{
@@ -149,26 +166,19 @@ export default function App() {
             <div key={i}
               style={{
                 maxWidth: "60%",
-                padding: 10,
-                margin: "5px 0",
-                borderRadius: 10,
-                background: m.direction === "outgoing" ? "#DCF8C6" : "white",
-                alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start"
+                padding: "8px 12px",
+                margin: "5px",
+                borderRadius: "15px",
+                background: m.direction === "outgoing" ? "#DCF8C6" : "#fff",
+                alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.2)"
               }}
             >
-
-              {/* 🔥 MEDIA UI */}
               {m.media ? (
                 m.mimeType?.startsWith("image") ? (
-                  <img
-                    src={API + "/uploads/" + m.message}
-                    alt="media"
-                    style={{ width: 200, borderRadius: 5 }}
-                  />
+                  <img src={API + "/uploads/" + m.message} width="200" />
                 ) : (
-                  <a href={API + "/uploads/" + m.message} target="_blank" rel="noreferrer">
-                    📎 Download File
-                  </a>
+                  <a href={API + "/uploads/" + m.message}>📎 File</a>
                 )
               ) : (
                 m.message
@@ -183,18 +193,26 @@ export default function App() {
         </div>
 
         {active && (
-          <div style={{ display: "flex", padding: 10, gap: 5 }}>
+          <div style={{ display: "flex", padding: 10, background: "#f0f0f0" }}>
             <input
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                socket.emit("typing", active);
+              }}
               style={{ flex: 1, padding: 10 }}
-              placeholder="Type message..."
             />
 
-            {/* 📎 FILE BUTTON */}
             <input type="file" onChange={sendFile} />
 
-            <button onClick={sendMsg}>Send</button>
+            <button style={{
+              background: "#25D366",
+              color: "white",
+              border: "none",
+              padding: "10px 15px"
+            }} onClick={sendMsg}>
+              Send
+            </button>
           </div>
         )}
       </div>
