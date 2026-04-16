@@ -37,7 +37,7 @@ router.post("/", async (req, res) => {
       status: "sent"
     });
 
-    // 🔥 realtime update
+    // 🔥 realtime
     req.io?.to(phone).emit("new_message", {
       phone,
       message,
@@ -48,16 +48,20 @@ router.post("/", async (req, res) => {
     res.json({ success: true });
 
   } catch (err) {
-    console.log(err.response?.data || err);
+    console.log("TEXT ERROR:", err.response?.data || err);
     res.status(500).send("Send failed");
   }
 });
 
 
-// 📎 UPLOAD MEDIA
+// 📎 UPLOAD MEDIA TO WHATSAPP (FIXED)
 const uploadToWhatsApp = async (filePath) => {
   const form = new FormData();
-  form.append("file", fs.createReadStream(filePath));
+
+  form.append("file", fs.createReadStream(filePath), {
+    filename: "file" // 🔥 IMPORTANT FIX
+  });
+
   form.append("messaging_product", "whatsapp");
 
   const res = await axios.post(
@@ -81,17 +85,25 @@ router.post("/media", upload.single("file"), async (req, res) => {
   const file = req.file;
 
   try {
+    if (!file) {
+      return res.status(400).send("No file uploaded");
+    }
+
     const mimeType = file.mimetype;
 
-    // ✅ upload to WhatsApp
+    console.log("FILE:", file);
+
+    // ✅ upload
     const mediaId = await uploadToWhatsApp(file.path);
+
+    console.log("MEDIA ID:", mediaId);
 
     // detect type
     let type = "document";
     if (mimeType.startsWith("image")) type = "image";
     if (mimeType.startsWith("video")) type = "video";
 
-    // ✅ send message
+    // ✅ send to WhatsApp
     await axios.post(
       `https://graph.facebook.com/v18.0/${process.env.PHONE_ID}/messages`,
       {
@@ -107,8 +119,7 @@ router.post("/media", upload.single("file"), async (req, res) => {
       }
     );
 
-    // 🔥 IMPORTANT FIX
-    // 👉 frontend ला local file लागतो preview साठी
+    // ✅ SAVE LOCAL FILE NAME (for UI preview)
     const fileName = file.filename;
 
     await Message.create({
@@ -120,7 +131,7 @@ router.post("/media", upload.single("file"), async (req, res) => {
       mimeType
     });
 
-    // 🔥 realtime emit
+    // 🔥 realtime update
     req.io?.to(phone).emit("new_message", {
       phone,
       message: fileName,
@@ -130,13 +141,13 @@ router.post("/media", upload.single("file"), async (req, res) => {
       status: "sent"
     });
 
-    // 🧹 cleanup temp file
-    fs.unlinkSync(file.path);
+    // ❌ IMPORTANT: delete करू नको (preview साठी लागतो)
+    // fs.unlinkSync(file.path);
 
     res.json({ success: true });
 
   } catch (err) {
-    console.log(err.response?.data || err);
+    console.log("MEDIA ERROR:", err.response?.data || err);
     res.status(500).send("Media send failed");
   }
 });
