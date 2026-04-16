@@ -44,7 +44,7 @@ export default function App() {
   }, [messages]);
 
   const sendMsg = async () => {
-    if (!text) return;
+    if (!text || !active) return;
 
     await axios.post(API + "/api/send", {
       phone: active,
@@ -58,6 +58,25 @@ export default function App() {
     }]);
 
     setText("");
+  };
+
+  // 🔥 MEDIA SEND FUNCTION
+  const sendFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !active) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("phone", active);
+
+    await axios.post(API + "/api/send/media", formData);
+
+    setMessages(prev => [...prev, {
+      message: file.name,
+      direction: "outgoing",
+      media: true,
+      mimeType: file.type
+    }]);
   };
 
   const filtered = contacts
@@ -122,7 +141,9 @@ export default function App() {
           flex: 1,
           padding: 10,
           overflowY: "auto",
-          background: "#ECE5DD"
+          background: "#ECE5DD",
+          display: "flex",
+          flexDirection: "column"
         }}>
           {messages.map((m, i) => (
             <div key={i}
@@ -135,7 +156,23 @@ export default function App() {
                 alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start"
               }}
             >
-              {m.message}
+
+              {/* 🔥 MEDIA UI */}
+              {m.media ? (
+                m.mimeType?.startsWith("image") ? (
+                  <img
+                    src={API + "/uploads/" + m.message}
+                    alt="media"
+                    style={{ width: 200, borderRadius: 5 }}
+                  />
+                ) : (
+                  <a href={API + "/uploads/" + m.message} target="_blank" rel="noreferrer">
+                    📎 Download File
+                  </a>
+                )
+              ) : (
+                m.message
+              )}
 
               <div style={{ fontSize: 10 }}>
                 {m.status === "seen" ? "✔✔" : "✔"}
@@ -146,12 +183,17 @@ export default function App() {
         </div>
 
         {active && (
-          <div style={{ display: "flex", padding: 10 }}>
+          <div style={{ display: "flex", padding: 10, gap: 5 }}>
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               style={{ flex: 1, padding: 10 }}
+              placeholder="Type message..."
             />
+
+            {/* 📎 FILE BUTTON */}
+            <input type="file" onChange={sendFile} />
+
             <button onClick={sendMsg}>Send</button>
           </div>
         )}
