@@ -13,6 +13,7 @@ export default function App() {
   const [typing, setTyping] = useState(false);
 
   const bottomRef = useRef();
+  const typingTimeout = useRef(null);
 
   const loadContacts = async () => {
     const res = await axios.get(API + "/api/contacts");
@@ -41,8 +42,14 @@ export default function App() {
       loadContacts();
     });
 
-    socket.on("typing", () => setTyping(true));
-    socket.on("stop_typing", () => setTyping(false));
+    // ✅ FIXED TYPING
+    socket.on("typing", (phone) => {
+      if (phone === active) setTyping(true);
+    });
+
+    socket.on("stop_typing", (phone) => {
+      if (phone === active) setTyping(false);
+    });
 
     socket.on("message_status", ({ phone, status }) => {
       setMessages(prev =>
@@ -51,7 +58,8 @@ export default function App() {
         )
       );
     });
-  }, []);
+
+  }, [active]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,15 +67,13 @@ export default function App() {
 
   // 🔥 SEND TEXT
   const sendMsg = async () => {
-    console.log("CLICKED", text, active);
-
     if (!active) {
-      alert("❌ First select chat");
+      alert("Select chat first");
       return;
     }
 
     if (!text) {
-      alert("❌ Enter message");
+      alert("Enter message");
       return;
     }
 
@@ -88,7 +94,7 @@ export default function App() {
       socket.emit("stop_typing", active);
 
     } catch (err) {
-      console.log("SEND ERROR:", err);
+      console.log(err);
       alert("Send failed");
     }
   };
@@ -120,7 +126,7 @@ export default function App() {
       }]);
 
     } catch (err) {
-      console.log("MEDIA ERROR:", err);
+      console.log(err);
       alert("Media send failed");
     }
   };
@@ -179,11 +185,25 @@ export default function App() {
 
       {/* RIGHT PANEL */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: 15, background: "#075E54", color: "white" }}>
-          {active || "Select chat"}
-          {typing && <div style={{ fontSize: 12 }}>Typing...</div>}
+
+        {/* HEADER */}
+        <div style={{
+          padding: 15,
+          background: "#075E54",
+          color: "white"
+        }}>
+          <div style={{ fontWeight: "bold" }}>
+            {active || "Select chat"}
+          </div>
+
+          {typing && (
+            <div style={{ fontSize: 12, color: "#d4f8e8" }}>
+              typing...
+            </div>
+          )}
         </div>
 
+        {/* CHAT */}
         <div style={{
           flex: 1,
           padding: 10,
@@ -222,19 +242,27 @@ export default function App() {
           <div ref={bottomRef}></div>
         </div>
 
+        {/* INPUT */}
         {active && (
           <div style={{
             display: "flex",
             padding: 10,
             background: "#f0f0f0",
             position: "relative",
-            zIndex: 10   // 🔥 FIX
+            zIndex: 10
           }}>
             <input
               value={text}
               onChange={(e) => {
                 setText(e.target.value);
+
                 socket.emit("typing", active);
+
+                clearTimeout(typingTimeout.current);
+
+                typingTimeout.current = setTimeout(() => {
+                  socket.emit("stop_typing", active);
+                }, 1000);
               }}
               style={{ flex: 1, padding: 10 }}
               placeholder="Type message..."
@@ -243,7 +271,7 @@ export default function App() {
             <input type="file" onChange={sendFile} />
 
             <button
-              onClick={() => sendMsg()}
+              onClick={sendMsg}
               style={{
                 background: "#25D366",
                 color: "white",
