@@ -22,30 +22,23 @@ router.get("/", (req, res) => {
 });
 
 
-// 📎 DOWNLOAD MEDIA FROM WHATSAPP
+// 📎 DOWNLOAD MEDIA
 const downloadMedia = async (mediaId) => {
   try {
-    // STEP 1: get media URL
     const urlRes = await axios.get(
       `https://graph.facebook.com/v18.0/${mediaId}`,
       {
-        headers: {
-          Authorization: `Bearer ${process.env.TOKEN}`
-        }
+        headers: { Authorization: `Bearer ${process.env.TOKEN}` }
       }
     );
 
     const mediaUrl = urlRes.data.url;
 
-    // STEP 2: download file
     const mediaRes = await axios.get(mediaUrl, {
-      headers: {
-        Authorization: `Bearer ${process.env.TOKEN}`
-      },
+      headers: { Authorization: `Bearer ${process.env.TOKEN}` },
       responseType: "arraybuffer"
     });
 
-    // STEP 3: save file locally
     const fileName = `${Date.now()}.bin`;
     const filePath = path.join("uploads", fileName);
 
@@ -73,12 +66,12 @@ router.post("/", async (req, res) => {
       let fileName = null;
       let mimeType = "";
 
-      // 🟢 TEXT MESSAGE
+      // 🟢 TEXT
       if (msg.text) {
         text = msg.text.body;
       }
 
-      // 🟢 IMAGE / DOC / VIDEO
+      // 🟢 MEDIA
       if (msg.image || msg.document || msg.video) {
         media = true;
 
@@ -92,7 +85,7 @@ router.post("/", async (req, res) => {
         text = fileName || "media";
       }
 
-      // ✅ save message
+      // ✅ SAVE MESSAGE
       await Message.create({
         phone,
         message: text,
@@ -102,7 +95,7 @@ router.post("/", async (req, res) => {
         mimeType
       });
 
-      // ✅ contact update
+      // ✅ CONTACT UPDATE
       let contact = await Contact.findOne({ phone });
 
       if (!contact) {
@@ -117,7 +110,7 @@ router.post("/", async (req, res) => {
         await contact.save();
       }
 
-      // ⚡ realtime message
+      // 🔥 REALTIME MESSAGE
       req.io?.to(phone).emit("new_message", {
         phone,
         message: text,
@@ -126,7 +119,13 @@ router.post("/", async (req, res) => {
         mimeType
       });
 
-      // ⚡ update contact list
+      // 🔥 DELIVERED STATUS (✔✔)
+      req.io?.to(phone).emit("message_status", {
+        phone,
+        status: "delivered"
+      });
+
+      // 🔥 CONTACT UPDATE
       req.io?.emit("contact_update", {
         phone,
         lastMessage: text
