@@ -210,7 +210,7 @@ export default function App() {
               borderBottom: "1px solid #eee"
             }}
           >
-            <b>{c.phone}</b>
+            <b>{c.name && c.name !== "" ? c.name : c.phone}</b>
             <div style={{ fontSize: 12 }}>{c.lastMessage}</div>
 
             {c.unread > 0 && (
