@@ -18,6 +18,7 @@ export default function App() {
   const [uploadMsg, setUploadMsg] = useState("");
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [totalCount, setTotalCount] = useState(0);
 
   const bottomRef = useRef();
   const typingTimeout = useRef(null);
@@ -25,6 +26,7 @@ export default function App() {
   const loadContacts = async () => {
     const res = await axios.get(API + "/api/contacts");
     setContacts(res.data);
+setTotalCount(res.data.length); // 🔥 ADD
   };
 
   useEffect(() => {
@@ -148,7 +150,7 @@ export default function App() {
 
         {/* 🔥 CONTACT COUNT */}
         <div style={{ padding: 10, fontSize: 12 }}>
-          Total Contacts: {contacts.length}
+          Total Contacts: {totalCount}
         </div>
 
         {/* 🔥 CONTACT FEATURES */}
@@ -182,7 +184,7 @@ export default function App() {
               formData.append("file", file);
 
               try {
-                setUploadMsg("Uploading...");
+                setUploadMsg("Uploading... ⏳");
                 const res = await axios.post(API + "/api/upload-csv", formData);
                 setUploadMsg(`Uploaded ${res.data.count}`);
                 loadContacts();
