@@ -12,7 +12,12 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [typing, setTyping] = useState(false);
 
-  const [tab, setTab] = useState("chats"); // SAME
+  const [tab, setTab] = useState("chats");
+
+  // 🔥 NEW STATES
+  const [uploadMsg, setUploadMsg] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
 
   const bottomRef = useRef();
   const typingTimeout = useRef(null);
@@ -37,7 +42,6 @@ export default function App() {
     socket.emit("join", phone);
   };
 
-  // SOCKET (UNCHANGED)
   useEffect(() => {
     socket.on("new_message", (msg) => {
       setMessages(prev => [...prev, msg]);
@@ -66,22 +70,18 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // TIME (UNCHANGED)
   const formatTime = (date) => {
     if (!date) return "";
-    const d = new Date(date);
-    return d.toLocaleTimeString([], {
+    return new Date(date).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit"
     });
   };
 
-  // DATE DIVIDER (UNCHANGED)
   const formatDateDivider = (date) => {
     if (!date) return "";
     const d = new Date(date);
     const today = new Date();
-
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
 
@@ -91,7 +91,6 @@ export default function App() {
     return d.toLocaleDateString();
   };
 
-  // SEND TEXT (UNCHANGED)
   const sendMsg = async () => {
     if (!active) return alert("Select chat first");
     if (!text) return alert("Enter message");
@@ -113,7 +112,6 @@ export default function App() {
     socket.emit("stop_typing", active);
   };
 
-  // SEND FILE (UNCHANGED)
   const sendFile = async (e) => {
     const file = e.target.files[0];
     if (!file || !active) return;
@@ -125,12 +123,8 @@ export default function App() {
     await axios.post(API + "/api/send/media", formData);
   };
 
-  // FILTER (UNCHANGED)
   const filtered = contacts
-    .filter(c => {
-      if (tab === "chats") return c.lastMessage;
-      return true;
-    })
+    .filter(c => tab === "chats" ? c.lastMessage : true)
     .filter(c =>
       c.phone.includes(search) ||
       (c.lastMessage || "").toLowerCase().includes(search.toLowerCase())
@@ -152,43 +146,52 @@ export default function App() {
           <button onClick={() => setTab("contacts")}>Contacts</button>
         </div>
 
-        {/* 🔥 FIXED CSV UPLOAD */}
+        {/* 🔥 CONTACT COUNT */}
+        <div style={{ padding: 10, fontSize: 12 }}>
+          Total Contacts: {contacts.length}
+        </div>
+
+        {/* 🔥 CONTACT FEATURES */}
         {tab === "contacts" && (
           <div style={{ padding: 10 }}>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={async (e) => {
-                const file = e.target.files[0];
 
-                if (!file) {
-                  alert("❌ Please select file");
-                  return;
-                }
+            {/* ➕ ADD */}
+            <div style={{ marginBottom: 10 }}>
+              <input placeholder="Name" value={newName} onChange={e => setNewName(e.target.value)} />
+              <input placeholder="Phone" value={newPhone} onChange={e => setNewPhone(e.target.value)} />
+              <button onClick={async () => {
+                if (!newPhone) return alert("Enter phone");
 
-                const formData = new FormData();
-                formData.append("file", file);
+                await axios.post(API + "/api/add-contact", {
+                  name: newName,
+                  phone: newPhone
+                });
 
-                try {
-                  await axios.post(API + "/api/upload-csv", formData, {
-                    headers: {
-                      "Content-Type": "multipart/form-data"
-                    }
-                  });
-
-                  alert("✅ Contacts uploaded!");
-                  loadContacts();
-
-                } catch (err) {
-                  console.log(err);
-                  alert("❌ Upload failed");
-                }
-              }}
-            />
-
-            <div style={{ fontSize: 12, marginTop: 5 }}>
-              Upload CSV (name, phone)
+                setNewName("");
+                setNewPhone("");
+                loadContacts();
+              }}>➕</button>
             </div>
+
+            {/* CSV */}
+            <input type="file" accept=".csv" onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+
+              const formData = new FormData();
+              formData.append("file", file);
+
+              try {
+                setUploadMsg("Uploading...");
+                const res = await axios.post(API + "/api/upload-csv", formData);
+                setUploadMsg(`Uploaded ${res.data.count}`);
+                loadContacts();
+              } catch {
+                setUploadMsg("Upload failed");
+              }
+            }} />
+
+            <div style={{ fontSize: 12 }}>{uploadMsg}</div>
           </div>
         )}
 
@@ -210,7 +213,16 @@ export default function App() {
               borderBottom: "1px solid #eee"
             }}
           >
-            <b>{c.name && c.name !== "" ? c.name : c.phone}</b>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <b>{c.name && c.name !== "" ? c.name : c.phone}</b>
+
+              <button onClick={async (e) => {
+                e.stopPropagation();
+                await axios.delete(API + "/api/delete-contact/" + c.phone);
+                loadContacts();
+              }}>🗑</button>
+            </div>
+
             <div style={{ fontSize: 12 }}>{c.lastMessage}</div>
 
             {c.unread > 0 && (
@@ -231,7 +243,6 @@ export default function App() {
       {/* RIGHT */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
 
-        {/* HEADER */}
         <div style={{
           padding: 15,
           background: "#075E54",
@@ -248,7 +259,6 @@ export default function App() {
           )}
         </div>
 
-        {/* CHAT */}
         <div style={{
           flex: 1,
           padding: 10,
@@ -286,8 +296,7 @@ export default function App() {
                     margin: "5px",
                     borderRadius: "15px",
                     background: m.direction === "outgoing" ? "#DCF8C6" : "#fff",
-                    alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)"
+                    alignSelf: m.direction === "outgoing" ? "flex-end" : "flex-start"
                   }}
                 >
                   {m.media ? (
@@ -300,14 +309,8 @@ export default function App() {
                     m.message
                   )}
 
-                  <div style={{
-                    fontSize: 10,
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 5
-                  }}>
-                    <span>{formatTime(m.createdAt)}</span>
-                    <span>{m.status === "seen" ? "✔✔" : "✔"}</span>
+                  <div style={{ fontSize: 10 }}>
+                    {formatTime(m.createdAt)} {m.status === "seen" ? "✔✔" : "✔"}
                   </div>
                 </div>
 
@@ -317,7 +320,6 @@ export default function App() {
           <div ref={bottomRef}></div>
         </div>
 
-        {/* INPUT */}
         {active && (
           <div style={{
             display: "flex",
@@ -339,7 +341,6 @@ export default function App() {
             />
 
             <input type="file" onChange={sendFile} />
-
             <button onClick={sendMsg}>Send</button>
           </div>
         )}
