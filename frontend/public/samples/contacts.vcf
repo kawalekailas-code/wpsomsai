@@ -1,0 +1,14 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Neha Example
+N:Example;Neha;;;
+TEL;TYPE=CELL:+919000000101
+NOTE:Friend from Pune
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:Arjun Example
+N:Example;Arjun;;;
+TEL;TYPE=CELL:+919000000102
+NOTE:College friend
+END:VCARD
