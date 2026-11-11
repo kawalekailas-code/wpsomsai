@@ -1,0 +1,12 @@
+{
+  "name": "wpsomsai-personal-chat",
+  "version": "2.2.0",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix backend ci && npm --prefix frontend ci",
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix backend test && npm --prefix frontend test",
+    "dev": "npm --prefix frontend run dev",
+    "start:api": "npm --prefix backend start"
+  }
+}

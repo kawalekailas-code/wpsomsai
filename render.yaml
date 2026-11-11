@@ -1,0 +1,66 @@
+# Optional fresh-deployment blueprint. For an existing deployment, update the
+# two services in place instead; keep their current URLs and environment values.
+services:
+  - type: web
+    name: omsai-chat-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: MONGO_URI
+        sync: false
+      - key: TOKEN
+        sync: false
+      - key: PHONE_ID
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: VERIFY_TOKEN
+        sync: false
+      - key: APP_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: WHATSAPP_API_VERSION
+        value: v25.0
+      - key: WABA_ID
+        sync: false
+      - key: SENDER_ENABLED
+        value: "false"
+      - key: SENDER_MAX_RECIPIENTS
+        value: "5000"
+      - key: SENDER_GAP_MS
+        value: "1000"
+      - key: STORAGE_LIMIT_MB
+        value: "512"
+      - key: ALLOW_FIRST_USER_SETUP
+        value: "false"
+  - type: web
+    name: omsai-chat
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: REACT_APP_API
+        sync: false
+      - key: VITE_DEMO_MODE
+        value: "false"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
